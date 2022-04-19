@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import wget
 import torch
 import os
+import random
 
 '''
 #рассчет доходностей
@@ -73,13 +74,14 @@ def profit_moving_average(prices, short, long, stoploss, takeprofit):
         stoploss: value in range (0, 1)
         takeprofit: value in range (0, 1)
     """
+    assert long > short
     wallet = 0
     r = prices[1:] / prices[:-1] - 1
-    short_moving = moving_average(prices, short)[long - short:-1]
-    long_moving = moving_average(prices, long)[:-1]
+    short_moving = moving_average(prices, short)[long - short:]
+    long_moving = moving_average(prices, long)
     assert len(short_moving) == len(long_moving)
-    r = r[long - 1:]
-    p = prices[long:]
+    r = r[long - 2:]
+    p = prices[long - 1:]
     flag = 0
     flags = torch.zeros_like(short_moving)
     sdel = {'sell': [], 'buy': []}
@@ -88,9 +90,9 @@ def profit_moving_average(prices, short, long, stoploss, takeprofit):
             continue
         # открытие сделок
         if short_moving[i - 1] < long_moving[i - 1] and short_moving[i] > long_moving[i]:
-            sdel['buy'].append(p[i + 1])
+            sdel['buy'].append(p[i])
         elif short_moving[i - 1] > long_moving[i - 1] and short_moving[i] < long_moving[i]:
-            sdel['sell'].append(p[i + 1])
+            sdel['sell'].append(p[i])
         # закрытие сделок
         for price in sdel['buy']:
             if p[i] / price - 1 >= takeprofit or p[i] / price - 1 <= -stoploss:
@@ -100,10 +102,10 @@ def profit_moving_average(prices, short, long, stoploss, takeprofit):
             if price / p[i] - 1 >= takeprofit or price / p[i] - 1 <= -stoploss:
                 wallet += price - p[i]
                 sdel['sell'].pop(sdel['sell'].index(price))
-    if not len(sdel['buy']) == 0:
-        print("buy: ", sdel['buy'])
-    if not len(sdel['sell']) == 0:
-        print("sell: ", sdel['sell'])
+    #if not len(sdel['buy']) == 0:
+    #    print("buy: ", sdel['buy'])
+    #if not len(sdel['sell']) == 0:
+    #    print("sell: ", sdel['sell'])
     #print(sdel)
     return wallet / p[1]
 
@@ -120,6 +122,7 @@ def profability_moving_average_slow(prices, short, long):
         else:
             wallet *= 1 - r_
     return wallet - 1
+
 
 
 def profability_moving_average(prices: torch.Tensor, short: int, long: int):
@@ -142,6 +145,84 @@ def load_prices(LINK):
            :int(len(data.values) * percentage / 100)]
     prices = torch.Tensor(data['Price'].values)
     return data, prices
+
+def sgd_step(x_0:int, y_0:int, z_0:float, w_0:float):
+    n = 0.0005
+    k = 1
+    a = profit_moving_average(prices, x_0,y_0,z_0,w_0)
+    if y_0 > x_0+k:
+        b = profit_moving_average(prices, x_0 + k,y_0,z_0,w_0)
+    else:
+        b = -1000000
+    c = profit_moving_average(prices, x_0 - k,y_0,z_0,w_0)
+    d = profit_moving_average(prices, x_0,y_0 + k,z_0,w_0)
+    if y_0 - k > x_0:
+        e = profit_moving_average(prices, x_0,y_0 - k,z_0,w_0)
+    else:
+        e = -1000000
+    f = profit_moving_average(prices, x_0,y_0, z_0 + n, w_0)
+    if z_0 - n > 0:
+        g = profit_moving_average(prices, x_0,y_0, z_0 - n, w_0)
+    else:
+        g = -1000000
+    h = profit_moving_average(prices, x_0,y_0, z_0, w_0 + n)
+    if w_0 - n > 0:
+        i = profit_moving_average(prices, x_0,y_0, z_0, w_0 - n)
+    else:
+        i = -1000000
+    if a == max(a,b,c,d,e,f,g,h,i):
+        return x_0,y_0,z_0,w_0
+    elif b == max(a,b,c,d,e,f,g,h,i):
+        return (x_0 + k,y_0,z_0,w_0)
+    elif c == max(a,b,c,d,e,f,g,h,i):
+        return (x_0 - k,y_0,z_0,w_0)
+    elif d == max(a,b,c,d,e,f,g,h,i):
+        return (x_0,y_0 + k,z_0,w_0)
+    elif e == max(a, b, c, d, e, f, g, h, i):
+        return (x_0, y_0 - k, z_0, w_0)
+    elif f == max(a, b, c, d, e, f, g, h, i):
+        return (x_0, y_0, z_0 + n, w_0)
+    elif g == max(a, b, c, d, e, f, g, h, i):
+            return (x_0, y_0, z_0 - n, w_0)
+    elif h == max(a, b, c, d, e, f, g, h, i):
+        return (x_0, y_0, z_0, w_0 + n)
+    elif i == max(a, b, c, d, e, f, g, h, i):
+            return (x_0, y_0, z_0, w_0 - n)
+
+
+
+def sgd(x_0:int, y_0:int, z_0:float, w_0:float):
+    (x,y,z,w) = sgd_step(x_0,y_0,z_0,w_0)
+    while (x,y,z,w) != (x_0,y_0,z_0,w_0):
+        x_0,y_0,z_0,w_0 = x,y,z,w
+        (x,y,z,w) = sgd_step(x_0,y_0,z_0,w_0)
+    return x_0,y_0,z_0,w_0
+
+def sgd_for_all(n:int):
+  l=[]
+  x=np.zeros(n, dtype=int)
+  y=np.zeros(n, dtype=int)
+  x_0=np.zeros(n, dtype=int)
+  y_0=np.zeros(n, dtype=int)
+  z=np.zeros(n, dtype=float)
+  w=np.zeros(n, dtype=float)
+  z_0 = np.zeros(n, dtype=float)
+  w_0 = np.zeros(n, dtype=float)
+  for i in range(n):
+    x[i] = random.randint(2,20)
+    y[i] = random.randint(x[i] + 1,50)
+    z[i] = random.uniform(0.0001,0.5)
+    w[i] = random.uniform(0.0001,0.9)
+    #print(x[i], y[i])
+    x_0[i],y_0[i],z_0[i],w_0[i] = sgd(x[i],y[i],z[i],w[i])
+    #print(int(x_0[i]), int(y_0[i]))
+    l.append(float(profit_moving_average(prices, int(x_0[i]), int(y_0[i]), z_0[i],w_0[i])))
+  maximize = max(l)
+  idx = l.index(maximize)
+
+  return maximize, x_0[idx], y_0[idx], z_0[idx], w_0[idx]
+
+
 
 
 if __name__ == '__main__':
@@ -171,3 +252,4 @@ if __name__ == '__main__':
         round(float(profability_moving_average_slow(prices, short, long)) * 100, 2)) + '%')
     print("prices[-1] / prices[0] - 1: ", prices[-1] / prices[0] - 1)
     print(profit_moving_average(prices, short, long, stoploss, takeprofit))
+    print(sgd_for_all(15))
