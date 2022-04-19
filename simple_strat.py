@@ -68,13 +68,61 @@ def profit_bnh_slow(prices: torch.Tensor):
     return profit - 1
 
 
-def profit_mooving_average(prices, short, long, stoploss, takeprofit):
-    x = []
-    for i in range(len(prices)):
-        pass
+def profit_moving_average(prices, short, long, stoploss, takeprofit):
+    """
+        stoploss: value in range (0, 1)
+        takeprofit: value in range (0, 1)
+    """
+    wallet = 0
+    r = prices[1:] / prices[:-1] - 1
+    short_moving = moving_average(prices, short)[long - short:-1]
+    long_moving = moving_average(prices, long)[:-1]
+    assert len(short_moving) == len(long_moving)
+    r = r[long - 1:]
+    p = prices[long:]
+    flag = 0
+    flags = torch.zeros_like(short_moving)
+    sdel = {'sell': [], 'buy': []}
+    for i in range(len(short_moving)):
+        if i == 0:
+            continue
+        # открытие сделок
+        if short_moving[i - 1] < long_moving[i - 1] and short_moving[i] > long_moving[i]:
+            sdel['buy'].append(p[i + 1])
+        elif short_moving[i - 1] > long_moving[i - 1] and short_moving[i] < long_moving[i]:
+            sdel['sell'].append(p[i + 1])
+        # закрытие сделок
+        for price in sdel['buy']:
+            if p[i] / price - 1 >= takeprofit or p[i] / price - 1 <= -stoploss:
+                wallet += p[i] - price
+                sdel['buy'].pop(sdel['buy'].index(price))
+        for price in sdel['sell']:
+            if price / p[i] - 1 >= takeprofit or price / p[i] - 1 <= -stoploss:
+                wallet += price - p[i]
+                sdel['sell'].pop(sdel['sell'].index(price))
+    if not len(sdel['buy']) == 0:
+        print("buy: ", sdel['buy'])
+    if not len(sdel['sell']) == 0:
+        print("sell: ", sdel['sell'])
+    #print(sdel)
+    return wallet / p[1]
 
 
-def profability_mooving_average(prices: torch.Tensor, short: int, long: int):
+def profability_moving_average_slow(prices, short, long):
+    wallet = 1
+    r = prices[1:] / prices[:-1] - 1
+    short_moving = moving_average(prices, short)[long - short:-1]
+    long_moving = moving_average(prices, long)[:-1]
+    r = r[long - 1:]
+    for r_, s, l in zip(r, short_moving, long_moving):
+        if (s > l):
+            wallet *= 1 + r_
+        else:
+            wallet *= 1 - r_
+    return wallet - 1
+
+
+def profability_moving_average(prices: torch.Tensor, short: int, long: int):
     """
       Доходность скользящих средних за весь период
     """
@@ -105,14 +153,21 @@ if __name__ == '__main__':
     # импорт данных
     data, prices = load_prices(LINK)
 
-    #short = 4
-    #long = 21
-    short = int(input())
-    long = int(input())
+    short = 4
+    long = 21
+    stoploss = 0.002
+    takeprofit = 0.006
+    # short = int(input())
+    # long = int(input())
     assert long > short
-    print('Годовая доходность стратегии скользящих средних ' + str(
+    print('Годовая доходность стратеги buy and hold ' + str(
         round(float(profitability_bnh(prices)) * 100, 2)) + '%')
     print(
-        'Годовая доходность стратегии скользящих средних ' + str(round(float(profit_bnh_slow(prices)) * 100, 2)) + '%')
-    print('Годовая доходность стратегии buy and hold ' + str(
-        round(float(profability_mooving_average(prices, short, long)) * 100, 2)) + '%')
+        'Годовая доходность стратегии buy and hold(медленная) ' + str(
+            round(float(profit_bnh_slow(prices)) * 100, 2)) + '%')
+    print('Годовая доходность стратегии скользящих средних (2 параметра)' + str(
+        round(float(profability_moving_average(prices, short, long)) * 100, 2)) + '%')
+    print('Годовая доходность стратегии скользящих средних (2 параметра, медленная) ' + str(
+        round(float(profability_moving_average_slow(prices, short, long)) * 100, 2)) + '%')
+    print("prices[-1] / prices[0] - 1: ", prices[-1] / prices[0] - 1)
+    print(profit_moving_average(prices, short, long, stoploss, takeprofit))
