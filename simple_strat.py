@@ -73,13 +73,14 @@ def profit_moving_average(prices, short, long, stoploss, takeprofit):
         stoploss: value in range (0, 1)
         takeprofit: value in range (0, 1)
     """
+    assert long > short
     wallet = 0
     r = prices[1:] / prices[:-1] - 1
-    short_moving = moving_average(prices, short)[long - short:-1]
-    long_moving = moving_average(prices, long)[:-1]
+    short_moving = moving_average(prices, short)[long - short:]
+    long_moving = moving_average(prices, long)
     assert len(short_moving) == len(long_moving)
-    r = r[long - 1:]
-    p = prices[long:]
+    r = r[long - 2:]
+    p = prices[long - 1:]
     flag = 0
     flags = torch.zeros_like(short_moving)
     sdel = {'sell': [], 'buy': []}
@@ -88,9 +89,9 @@ def profit_moving_average(prices, short, long, stoploss, takeprofit):
             continue
         # открытие сделок
         if short_moving[i - 1] < long_moving[i - 1] and short_moving[i] > long_moving[i]:
-            sdel['buy'].append(p[i + 1])
+            sdel['buy'].append(p[i])
         elif short_moving[i - 1] > long_moving[i - 1] and short_moving[i] < long_moving[i]:
-            sdel['sell'].append(p[i + 1])
+            sdel['sell'].append(p[i])
         # закрытие сделок
         for price in sdel['buy']:
             if p[i] / price - 1 >= takeprofit or p[i] / price - 1 <= -stoploss:
