@@ -1,10 +1,11 @@
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 import wget
 import torch
 import os
 import random
+from datetime import datetime
+
 
 '''
 #рассчет доходностей
@@ -219,8 +220,9 @@ def sgd_for_all(n:int):
     l.append(float(profit_moving_average(prices, int(x_0[i]), int(y_0[i]), z_0[i],w_0[i])))
   maximize = max(l)
   idx = l.index(maximize)
+  s = (x_0[idx], y_0[idx], z_0[idx], w_0[idx])
 
-  return maximize, x_0[idx], y_0[idx], z_0[idx], w_0[idx]
+  return maximize, s
 
 
 
@@ -241,15 +243,19 @@ if __name__ == '__main__':
     # short = int(input())
     # long = int(input())
     assert long > short
-    print('Годовая доходность стратеги buy and hold ' + str(
-        round(float(profitability_bnh(prices)) * 100, 2)) + '%')
-    print(
-        'Годовая доходность стратегии buy and hold(медленная) ' + str(
-            round(float(profit_bnh_slow(prices)) * 100, 2)) + '%')
-    print('Годовая доходность стратегии скользящих средних (2 параметра)' + str(
-        round(float(profability_moving_average(prices, short, long)) * 100, 2)) + '%')
-    print('Годовая доходность стратегии скользящих средних (2 параметра, медленная) ' + str(
-        round(float(profability_moving_average_slow(prices, short, long)) * 100, 2)) + '%')
-    print("prices[-1] / prices[0] - 1: ", prices[-1] / prices[0] - 1)
-    print(profit_moving_average(prices, short, long, stoploss, takeprofit))
-    print(sgd_for_all(15))
+    #print('Годовая доходность стратеги buy and hold ' + str(
+    #    round(float(profitability_bnh(prices)) * 100, 2)) + '%')
+    #print(
+    #    'Годовая доходность стратегии buy and hold(медленная) ' + str(
+    #        round(float(profit_bnh_slow(prices)) * 100, 2)) + '%')
+    #print('Годовая доходность стратегии скользящих средних (2 параметра)' + str(
+    #    round(float(profability_moving_average(prices, short, long)) * 100, 2)) + '%')
+    #print('Годовая доходность стратегии скользящих средних (2 параметра, медленная) ' + str(
+    #    round(float(profability_moving_average_slow(prices, short, long)) * 100, 2)) + '%')
+    #print("prices[-1] / prices[0] - 1: ", prices[-1] / prices[0] - 1)
+    #print(profit_moving_average(prices, short, long, stoploss, takeprofit))
+
+    start = datetime.now()
+    res, params = sgd_for_all(10)
+    print("Максимальная выручка: ", res, "Параметры: ", params)
+    print("время исполнения: ", datetime.now() - start)
