@@ -1,5 +1,6 @@
 .venv
 .idea
+**/__pycache__/
 # Created by https://www.toptal.com/developers/gitignore/api/pycharm+iml
 # Edit at https://www.toptal.com/developers/gitignore?templates=pycharm+iml
 
