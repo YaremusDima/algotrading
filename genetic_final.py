@@ -188,6 +188,19 @@ def genetic_alg(prices, num_weights, sol_per_pop, num_parents_mating, num_genera
         #print(results)
     return max(results.keys()), results[max(results.keys())]
 
+def brute_force(prices, sl_tp_step):
+    best_res = 0
+    best_params = []
+    for s in range(2, 51):
+        for l in range(s+1, 51):
+            for sl in np.arange(0.0001, 0.2, sl_tp_step):
+                for tp in np.arange(0.0001, 0.2, sl_tp_step):
+                    res = profit_moving_average(prices, s, l, sl, tp)
+                    if res > best_res:
+                        best_res = res
+                        best_params = [s, l, sl, tp]
+    return best_res, best_params
+
 
 if __name__ == '__main__':
     # константы
